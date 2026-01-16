@@ -51,6 +51,8 @@ PRESETS = {
   "off": [],
 
   "light": [
+    "pan=mono|c0=0.5*c0+0.5*c1",
+    "volume=-6dB",
     "highpass=f=80",
     "lowpass=f=8000",
     "acompressor=threshold=-20dB:ratio=4:attack=5:release=100",
@@ -58,6 +60,8 @@ PRESETS = {
   ],
 
   "medium": [
+    "pan=mono|c0=0.5*c0+0.5*c1",
+    "volume=-6dB",
     "highpass=f=120",
     "lowpass=f=6000",
     "acompressor=threshold=-18dB:ratio=6:attack=3:release=80",
@@ -66,6 +70,8 @@ PRESETS = {
   ],
 
   "heavy": [
+    "pan=mono|c0=0.5*c0+0.5*c1",
+    "volume=-6dB",
     "highpass=f=150",
     "lowpass=f=4500",  # Aggressive HF cut
     "acompressor=threshold=-15dB:ratio=8:attack=2:release=50",
@@ -102,7 +108,6 @@ def convert_to_pcm_mono(wav_path, pcm_path, sample_rate, preset="medium"):
     "ffmpeg", "-y",
     "-i", str(wav_path),
     "-af", filter_str,
-    "-ac", "1",
     "-ar", str(sample_rate),
     "-f", "s16le",
     str(pcm_path)

@@ -3,8 +3,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-SAMPLE_RATE = 32768
-
 # ---- Simple DFPWM encoder (Python) ----
 class DFPWMEncoder:
     def __init__(self):
@@ -61,12 +59,12 @@ def run(cmd):
 def download_audio(url, out_path):
     run(["yt-dlp", "-x", "--audio-format", "wav", "-o", str(out_path), url])
 
-def convert_to_pcm48k_mono(wav_path, pcm_path):
+def convert_to_pcm48k_mono(wav_path, pcm_path, sample_rate):
     run([
         "ffmpeg", "-y",
         "-i", str(wav_path),
         "-ac", "1",
-        "-ar", str(SAMPLE_RATE),
+        "-ar", str(sample_rate),
         "-f", "s16le",
         str(pcm_path)
     ])
@@ -97,7 +95,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("url", help="YouTube URL")
     ap.add_argument("--out", default="out", help="Output directory")
-    ap.add_argument("--chunk-seconds", type=int, default=60, help="Seconds per chunk")
+    ap.add_argument("--chunk-seconds", type=int, default=12, help="Seconds per chunk")
+    ap.add_argument("--DFPWM1a", type=bool, default="false", help="Whether to sample at 32768 or 48000 Hz")
     args = ap.parse_args()
 
     out_dir = Path(args.out)
@@ -107,11 +106,13 @@ def main():
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    sample_rate = 48000 if args.DFPWM1a else 32768
+
     download_audio(args.url, tmp_wav)
-    convert_to_pcm48k_mono(tmp_wav, tmp_pcm)
+    convert_to_pcm48k_mono(tmp_wav, tmp_pcm, sample_rate)
     encode_dfpwm(tmp_pcm, full_dfpwm)
 
-    bytes_per_second = SAMPLE_RATE // 8
+    bytes_per_second = sample_rate // 8
     chunk_bytes = args.chunk_seconds * bytes_per_second
     split_file(full_dfpwm, out_dir, chunk_bytes)
 

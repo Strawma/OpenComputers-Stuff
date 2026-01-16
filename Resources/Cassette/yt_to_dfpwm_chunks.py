@@ -110,7 +110,7 @@ def main():
     encode_dfpwm(tmp_pcm, full_dfpwm)
 
     # DFPWM is 1 bit per sample. At 48kHz: 48000 bits/sec = 6000 bytes/sec.
-    chunk_bytes = args.chunk_seconds * 6000
+    chunk_bytes = args.chunk_seconds * 4096
     split_file(full_dfpwm, out_dir, chunk_bytes)
 
     print("Done. Chunks in:", out_dir)

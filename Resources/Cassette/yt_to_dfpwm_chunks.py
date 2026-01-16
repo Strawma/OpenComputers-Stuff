@@ -63,6 +63,8 @@ def convert_to_pcm_mono(wav_path, pcm_path, sample_rate, preprocess=True):
     # High-pass: remove sub-bass rumble (<80Hz) that wastes bits
     filters.append("highpass=f=80")
 
+    filters.append("afftdn=nf=-25")  # noise floor at -25dB
+
     # Low-pass: DFPWM struggles with high frequencies
     #    At 32768Hz, Nyquist is ~16kHz, but 8-10kHz sounds cleaner
     nyquist = sample_rate // 2

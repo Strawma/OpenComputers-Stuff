@@ -3,7 +3,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-# ---- Simple DFPWM encoder (Python) ----
+
 class DFPWMEncoder:
   def __init__(self):
     self.level = 0
@@ -45,44 +45,57 @@ class DFPWMEncoder:
     self.lastbit = lastbit
     return bytes(out)
 
+
+# Preprocessing presets
+PRESETS = {
+  "off": [],
+
+  "light": [
+    "highpass=f=80",
+    "lowpass=f=8000",
+    "acompressor=threshold=-20dB:ratio=4:attack=5:release=100",
+    "loudnorm=I=-16:TP=-1.5:LRA=11",
+  ],
+
+  "medium": [
+    "highpass=f=120",
+    "lowpass=f=6000",
+    "acompressor=threshold=-18dB:ratio=6:attack=3:release=80",
+    "loudnorm=I=-14:TP=-1:LRA=7",
+    "agate=threshold=-35dB:attack=10:release=50",
+  ],
+
+  "heavy": [
+    "highpass=f=150",
+    "lowpass=f=4500",  # Aggressive HF cut
+    "acompressor=threshold=-15dB:ratio=8:attack=2:release=50",
+    # Heavy compression
+    "alimiter=limit=-3dB:level=false",  # Brick-wall limiter
+    "loudnorm=I=-12:TP=-1:LRA=5",  # Louder, less dynamic
+    "agate=threshold=-30dB:attack=5:release=30",  # Aggressive gate
+  ],
+
+  "voice": [
+    "highpass=f=200",  # Cut more low end (voices don't need it)
+    "lowpass=f=4000",  # Telephone-ish bandwidth
+    "acompressor=threshold=-12dB:ratio=10:attack=2:release=40",
+    "alimiter=limit=-2dB:level=false",
+    "loudnorm=I=-10:TP=-1:LRA=4",
+  ],
+}
+
+
 def run(cmd):
   print(">", " ".join(cmd))
   subprocess.check_call(cmd)
 
+
 def download_audio(url, out_path):
   run(["yt-dlp", "-x", "--audio-format", "wav", "-o", str(out_path), url])
 
-def convert_to_pcm_mono(wav_path, pcm_path, sample_rate, preprocess=True):
-  """
-    Convert audio to mono PCM with optional preprocessing for DFPWM.
-    """
-  # Build filter chain
-  filters = []
 
-  if preprocess:
-    # High-pass: remove sub-bass rumble (<80Hz) that wastes bits
-    filters.append("highpass=f=80")
-
-    filters.append("afftdn=nf=-25")  # noise floor at -25dB
-
-    # Low-pass: DFPWM struggles with high frequencies
-    #    At 32768Hz, Nyquist is ~16kHz, but 8-10kHz sounds cleaner
-    nyquist = sample_rate // 2
-    lpf_freq = min(8000, nyquist - 1000)
-    filters.append(f"lowpass=f={lpf_freq}")
-
-    # Compressor: reduce dynamic range so quiet parts aren't lost in noise
-    #    threshold=-20dB, ratio=4:1, attack=5ms, release=100ms
-    filters.append("acompressor=threshold=-20dB:ratio=4:attack=5:release=100")
-
-    # Normalize: maximize use of available range
-    #    loudnorm does EBU R128 loudness normalization
-    filters.append("loudnorm=I=-16:TP=-1.5:LRA=11")
-
-    # Noise gate: silence very quiet parts to avoid encoding noise as signal
-    #    threshold=-40dB, attack=10ms, release=100ms
-    filters.append("agate=threshold=-40dB:attack=10:release=100")
-
+def convert_to_pcm_mono(wav_path, pcm_path, sample_rate, preset="medium"):
+  filters = PRESETS.get(preset, PRESETS["medium"])
   filter_str = ",".join(filters) if filters else "anull"
 
   cmd = [
@@ -96,6 +109,7 @@ def convert_to_pcm_mono(wav_path, pcm_path, sample_rate, preprocess=True):
   ]
   run(cmd)
 
+
 def encode_dfpwm(pcm_path, dfpwm_path):
   enc = DFPWMEncoder()
   with open(pcm_path, "rb") as f_in, open(dfpwm_path, "wb") as f_out:
@@ -104,6 +118,7 @@ def encode_dfpwm(pcm_path, dfpwm_path):
       if not chunk:
         break
       f_out.write(enc.encode(chunk))
+
 
 def split_file(path, out_dir, chunk_bytes):
   out_dir.mkdir(parents=True, exist_ok=True)
@@ -118,18 +133,15 @@ def split_file(path, out_dir, chunk_bytes):
         out.write(data)
       i += 1
 
+
 def main():
-  ap = argparse.ArgumentParser(
-      description="Download and convert audio to DFPWM for ComputerCraft"
-  )
+  ap = argparse.ArgumentParser()
   ap.add_argument("url", help="YouTube URL")
   ap.add_argument("--out", default="out", help="Output directory")
-  ap.add_argument("--chunk-seconds", type=int, default=10,
-                  help="Seconds per chunk")
-  ap.add_argument("--dfpwm1a", action="store_true",
-                  help="Use DFPWM1a (48kHz) instead of old DFPWM (32768Hz)")
-  ap.add_argument("--no-preprocess", action="store_true",
-                  help="Disable audio preprocessing")
+  ap.add_argument("--chunk-seconds", type=int, default=10)
+  ap.add_argument("--dfpwm1a", action="store_true")
+  ap.add_argument("--preset", choices=PRESETS.keys(), default="medium",
+                  help="Preprocessing intensity: off, light, medium, heavy, voice")
   args = ap.parse_args()
 
   out_dir = Path(args.out)
@@ -142,8 +154,7 @@ def main():
   sample_rate = 48000 if args.dfpwm1a else 32768
 
   download_audio(args.url, tmp_wav)
-  convert_to_pcm_mono(tmp_wav, tmp_pcm, sample_rate,
-                      preprocess=not args.no_preprocess)
+  convert_to_pcm_mono(tmp_wav, tmp_pcm, sample_rate, preset=args.preset)
   encode_dfpwm(tmp_pcm, full_dfpwm)
 
   bytes_per_second = sample_rate // 8
@@ -151,6 +162,7 @@ def main():
   split_file(full_dfpwm, out_dir, chunk_bytes)
 
   print("Done. Chunks in:", out_dir)
+
 
 if __name__ == "__main__":
   sys.exit(main())

@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+SAMPLE_RATE = 32768
+
 # ---- Simple DFPWM encoder (Python) ----
 class DFPWMEncoder:
     def __init__(self):
@@ -64,7 +66,7 @@ def convert_to_pcm48k_mono(wav_path, pcm_path):
         "ffmpeg", "-y",
         "-i", str(wav_path),
         "-ac", "1",
-        "-ar", "48000",
+        "-ar", str(SAMPLE_RATE),
         "-f", "s16le",
         str(pcm_path)
     ])
@@ -109,8 +111,8 @@ def main():
     convert_to_pcm48k_mono(tmp_wav, tmp_pcm)
     encode_dfpwm(tmp_pcm, full_dfpwm)
 
-    # DFPWM is 1 bit per sample. At 48kHz: 48000 bits/sec = 6000 bytes/sec.
-    chunk_bytes = args.chunk_seconds * 4096
+    bytes_per_second = SAMPLE_RATE // 8
+    chunk_bytes = args.chunk_seconds * bytes_per_second
     split_file(full_dfpwm, out_dir, chunk_bytes)
 
     print("Done. Chunks in:", out_dir)

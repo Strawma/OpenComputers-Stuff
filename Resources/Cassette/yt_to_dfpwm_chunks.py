@@ -95,7 +95,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("url", help="YouTube URL")
     ap.add_argument("--out", default="out", help="Output directory")
-    ap.add_argument("--chunk-seconds", type=int, default=12, help="Seconds per chunk")
+    ap.add_argument("--chunk-seconds", type=int, default=10, help="Seconds per chunk")
     ap.add_argument("--DFPWM1a", type=bool, default="false", help="Whether to sample at 32768 or 48000 Hz")
     args = ap.parse_args()
 
